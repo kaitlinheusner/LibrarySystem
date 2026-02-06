@@ -2,45 +2,46 @@ import sqlite3
 import datetime
 
 def main():
-    conAccount = sqlite3.connect("libraryAccounts.db")
-    conBooks = sqlite3.connect("libraryBooks.db")
-    curAccount = conAccount.cursor()
-    curBooks = conBooks.cursor()
+    con = sqlite3.connect("library.db")
+    cur = con.cursor()
 
-    curAccount.execute("""CREATE TABLE IF NOT EXISTS libraryAccounts( 
+    cur.execute("PRAGMA foreign_keys = ON")
+
+    cur.execute("""CREATE TABLE IF NOT EXISTS libraryAccounts( 
                 accountID INTEGER PRIMARY KEY AUTOINCREMENT,
                 firstName TEXT,
                 lastName TEXT,
-                year INTEGER)""")
+                year INTEGER,
+                UNIQUE(firstName, lastName))""")
     
-    curBooks.execute("""CREATE TABLE IF NOT EXISTS libraryBooks(
-                bookId INTEGER PRIMARY KEY AUTOINCREMENT,
+    cur.execute("""CREATE TABLE IF NOT EXISTS libraryBooks(
+                bookID INTEGER PRIMARY KEY AUTOINCREMENT,
                 accountID INTEGER,
-                title TEXT,
+                title TEXT UNIQUE,
                 Author TEXT,
                 Year INTEGER,
                 status TEXT,
                 FOREIGN KEY(accountID) REFERENCES libraryAccounts(accountID))""")
 
-    curAccount.execute("""
+    cur.execute("""
             INSERT OR IGNORE INTO libraryAccounts(firstName, lastName, year)
                        VALUES  
                        ('Samantha', 'Green', 2015),
                        ('Adam', 'Stone', 2020)""")
 
-    curBooks.execute("""
-            INSERT OR IGNORE INTO libraryBooks (bookId, accountID, title, Author, Year, status)
+    cur.execute("""
+            INSERT OR IGNORE INTO libraryBooks (accountID, title, Author, Year, status)
             VALUES
-            (1, NULL, 'To Kill a Mockingbird', 'Harper Lee', 1960, 'Available'),
-            (2, 1, '1984', 'George Orwell', 1949, 'Checked Out'),
-            (3, 2, 'The Great Gatsby', 'F. Scott Fitzgerald', 1925, 'Available'),
-            (4, NULL, 'Pride and Prejudice', 'Jane Austen', 1813, 'Available'),
-            (5, NULL, 'The Hobbit', 'J.R.R. Tolkien', 1937, 'Checked Out'),
-            (6, NULL, 'Fahrenheit 451', 'Ray Bradbury', 1953, 'Available'),
-            (7, 2, 'The Catcher in the Rye', 'J.D. Salinger', 1951, 'Available'),
-            (8, NULL, 'Moby-Dick', 'Herman Melville', 1851, 'Checked Out'),
-            (9, NULL, 'The Hunger Games', 'Suzanne Collins', 2008, 'Available'),
-            (10, NULL, 'Harry Potter and the Sorcerer''s Stone', 'J.K. Rowling', 1997, 'Checked Out')""")
+            (NULL, 'To Kill a Mockingbird', 'Harper Lee', 1960, 'Available'),
+            (1, '1984', 'George Orwell', 1949, 'Checked Out'),
+            (2, 'The Great Gatsby', 'F. Scott Fitzgerald', 1925, 'Available'),
+            (NULL, 'Pride and Prejudice', 'Jane Austen', 1813, 'Available'),
+            (NULL, 'The Hobbit', 'J.R.R. Tolkien', 1937, 'Checked Out'),
+            (NULL, 'Fahrenheit 451', 'Ray Bradbury', 1953, 'Available'),
+            (2, 'The Catcher in the Rye', 'J.D. Salinger', 1951, 'Available'),
+            (NULL, 'Moby-Dick', 'Herman Melville', 1851, 'Checked Out'),
+            (NULL, 'The Hunger Games', 'Suzanne Collins', 2008, 'Available'),
+            ( NULL, 'Harry Potter and the Sorcerer''s Stone', 'J.K. Rowling', 1997, 'Checked Out')""")
 
     program_run = True
 
@@ -52,171 +53,197 @@ def main():
         print("3. Return Book")
         print("4. View All Account Records")
         print("5. View All Books")
-        print("6. View All Authors")
-        print("7. Find Account")
-        print("8. Remove Book")
-        print("9. Remove Account")
-        print("10. Exit the program")
+        print("6. Show All Available Books")
+        print("7. View All Authors")
+        print("8. Find Account")
+        print("9. Remove Book")
+        print("10. Remove Account")
+        print("11. Exit the program")
 
         try:
             userChoice = int(input("Enter your choice (use one of the numbers): "))
         except ValueError:
             print("Please enter a number")
+            continue
 
         match userChoice:
             case 1:
-                first_name = input("What is your first name?")
-                last_name = input("What is your last name?")
+                first_name = input("What is your first name? ")
+                last_name = input("What is your last name? ")
                 year = datetime.datetime.now().year
 
                 sql_query = "INSERT INTO libraryAccounts(firstName, lastName, year) Values (?, ?, ?)" 
 
-                curAccount.execute(sql_query, (first_name, last_name, year))
+                cur.execute(sql_query, (first_name, last_name, year))
 
-                conAccount.commit()
+                con.commit()
 
-                print("Account created succesfully")
+                print(f"Account created successfully! Your account ID is {cur.lastrowid}")
 
-                break
+                continue
 
             case 2:
-                first_name = input("What is your first name?")
-                last_name = input("What is your last name?")
+                account_id = int(input("Enter your account ID: "))
 
-                curAccount.execute("SELECT accountID FROM libraryAccounts WHERE firstName = ? AND lastName = ?", (first_name, last_name))
-                account_result = curAccount.fetchone()
+                cur.execute("SELECT accountID FROM libraryAccounts WHERE accountID = ?", (account_id,))
+                account_result = cur.fetchone()
 
-                if account_result:
-                    account_id = account_result[0]
+                if not account_result:
+                    print("We could not find an account associated with this ID." )
+                    continue
 
-                else:
-                    print("We could not find an account assosciated with this name!")
-                    break 
+                account_id = account_result[0]
 
-                book_name = input ("What book would you like to borrow?")
-                curBooks.execute("SELECT bookID FROM libraryBooks WHERE title = ?", (book_name))
-                book_result = curBooks.fetchone()
+                book_name = input ("What book would you like to borrow? ")
+                cur.execute("SELECT bookID FROM libraryBooks WHERE title = ?", (book_name,))
+                book_result = cur.fetchone()
 
                 if book_result:
                     book_id = book_result[0]
 
                 else:
                     print("We could not find this book!")
-                    break 
+                    continue 
 
                 sql_query = ("""
                         UPDATE libraryBooks
                         SET accountID = ?,  status = 'Checked Out'
-                        WHERE bookId = ? AND accountID IS NULL""")
+                        WHERE bookID = ? AND status = 'Available'""")
 
-                curBooks.execute(sql_query, (book_id, account_id))
-                conBooks.commit()
+                cur.execute(sql_query, (account_id, book_id))
 
-                print("Book borrowed succesfully!")
+                if cur.rowcount == 0:
+                    print("This book is already checked out.")
 
-                break
+                else: 
+                    con.commit()
+                    print("Book borrowed succesfully!")
+
+                continue
 
             case 3:
-                book_name = input ("What book would you like to return?")  
-                curBooks.execute("SELECT bookID FROM libraryBooks WHERE title ", (book_name,))
-                book_result = curBooks.fetchone()
+                account_id = int(input("Enter your account ID: "))
 
-                if book_result:
-                    book_id = book_result[0]
+                cur.execute("SELECT accountID FROM libraryAccounts WHERE accountID = ?", (account_id,))
+                account_result = cur.fetchone()
 
-                else:
-                    print("We could not find this book!")
-                    break 
+                if not account_result:
+                    print("We could not find an account associated with this ID.")
+                    continue
+                
+                book_name = input("What book would you like to return? ")
+                cur.execute("SELECT bookID FROM libraryBooks WHERE title = ? AND accountID = ? AND status = 'Checked Out'", (book_name, account_id))
 
-                sql_query = ("""
-                        UPDATE libraryBooks
-                        SET accountID = NULL,  status = 'Available'
-                        WHERE bookId = ?""")
+                book_result = cur.fetchone()
 
-                curBooks.execute(sql_query, (book_id,))
-                conBooks.commit()
-                print("Book returned succesfully")
+                if not book_result:
+                    print("This account does not have that book checked out.")
+                    continue
+                
+                book_id = book_result[0]
 
-                break
+                cur.execute("""
+                    UPDATE libraryBooks
+                    SET accountID = NULL, status = 'Available'
+                    WHERE bookID = ?
+                """, (book_id,))
+
+                con.commit()
+
+                print("Book returned successfully!")
+                continue
 
             case 4:
-                curAccount.execute("SELECT * FROM libraryAccounts")
-                account_results = curAccount.fetchall()
+                cur.execute("SELECT * FROM libraryAccounts")
+                account_results =   cur.fetchall()
 
                 for row in account_results:
                     print(row)
 
-                break
+                continue
 
             case 5:
-                curBooks.execute("SELECT * FROM libraryBooks")
-                book_results = curBooks.fetchall()
+                cur.execute("SELECT * FROM libraryBooks")
+                book_results = cur.fetchall()
 
                 for row in book_results:
                     print(row)
 
-                break
+                continue
 
             case 6:
-                curBooks.execute("SELECT author FROM libraryBooks")
-                author_results = curAccount.fetchone()
-                print(author_results)
-
-                break
+                cur.execute("SELECT title FROM libraryBooks WHERE status = 'Available'")
+                available_books = cur.fetchall()
+                print("Available books:")
+                for book in available_books:
+                    print("-", book[0])
 
             case 7:
-                first_name = input("What is your first name?")
-                last_name = input("What is your last name?")
+                cur.execute("SELECT DISTINCT author FROM libraryBooks")
+                author_results = cur.fetchall()
+                
+                for author in author_results:
+                    print(author)
 
-                account_id = curAccount.execute("SELECT accountID FROM libraryAccounts WHERE firstName = ? AND lastName = ?", (first_name, last_name))
-                account_result = curAccount.fetchone()
-
-                if account_result:
-                    account_id = account_result
-
-                else:
-                    print("We could not find an account assosciated with this name!")
-                    break 
-
-                break            
+                continue
 
             case 8:
-                book_name = input ("What book would you like to remove?")  
-                book_id = curBooks.execute("SELECT bookID FROM libraryBooks WHERE title ", (book_name,))
-                book_result = curBooks.fetchone()
+                account_id = int(input("Enter your account ID: "))
+
+                cur.execute("SELECT firstName, lastName, year FROM libraryAccounts WHERE accountID = ?", (account_id,))
+                account_result = cur.fetchone()
+
+                if account_result:
+                    print(f"First Name: {account_result[0]}, Last Name: {account_result[1]}, Year Created: {account_result[2]}")
+
+                else:
+                    print("We could not find an account assosciated with this ID!")
+                    continue 
+
+                continue            
+
+            case 9:
+                book_name = input ("What book would you like to remove? ")  
+                cur.execute("SELECT bookID FROM libraryBooks WHERE title = ?", (book_name,))
+                book_result = cur.fetchone()
 
                 if book_result:
-                    conBooks.execute("DELETE FROM libraryBooks WHERE title ?", (book_name,))
-                    conBooks.commit()
+                    cur.execute("DELETE FROM libraryBooks WHERE title = ?", (book_name,))
+                    con.commit()
 
                     print("Book removed succesfully!")
 
                 else:
                     print("We could not find this book!")
-                    break 
+                    continue 
 
-                break
-
-            case 9:
-                first_name = input("What is your first name?")
-                last_name = input("What is your last name?")
-
-                curAccount.execute("SELECT accountID FROM libraryAccounts WHERE firstName = ? AND lastName = ?", (first_name, last_name))
-                account_result = curAccount.fetchone()
-
-                if account_result:
-                    conAccount.execute("DELETE FROM libraryAccounts WHERE firstName = ? AND lastName = ?", (first_name, last_name))
-                    conAccount.commit()
-
-                    print("This account was deleted succesfully.")
-
-                else:
-                    print("We could not find an account associated with this name!")
-                    break
-                
-                break
+                continue
 
             case 10:
+                account_id = int(input("Enter your account ID: "))
+                cur.execute("SELECT accountID FROM libraryAccounts WHERE accountID = ?", (account_id,))
+                account_result = cur.fetchone()
+
+                if account_result:
+                    cur.execute("SELECT * FROM libraryBooks WHERE accountID = ?", (account_result[0],))
+
+                    if cur.fetchone():
+                        print("Account has borrowed books. Cannot delete.")
+                        continue
+
+                    else:
+                        con.execute("DELETE FROM libraryAccounts WHERE accountID = ?", (account_result[0],))
+                        con.commit()
+                        print("This account was deleted succesfully.")
+
+                else:
+                    print("We could not find an account associated with this ID!")
+                    continue
+                
+                continue
+
+            case 11:
+                con.close()
                 return
             
 if __name__ == "__main__":
